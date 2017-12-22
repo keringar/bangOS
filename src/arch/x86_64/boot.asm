@@ -10,6 +10,8 @@ start:
     ; Move Multiboot info pointer to edi
     mov edi, ebx
 
+    call clear_screen
+
     ; Check for required cpu support, erroring if not supported
     call check_multiboot
     call check_cpuid
@@ -27,6 +29,16 @@ start:
     ; print 'OK' to screen
     mov dword [0xb8000], 0x2f4b2f4f
     hlt
+
+clear_screen:
+    pusha
+    mov eax, 0x20
+    mov edi, 0xb8000
+    mov ecx, 80 * 25
+    cld
+    rep stosw
+    popa
+    ret
 
 ; Check if the kernel was booted by a multiboot compliant bootloader. A multiboot compilant
 ; bootloader must write the magic value 0x36d76289 to the eax register
