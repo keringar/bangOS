@@ -1,0 +1,1 @@
+{"rustc":5190010269457199862,"features":"[]","target":10262890430866757398,"profile":731176819336294830,"deps":[["rlibc v1.0.0",9619127438912665784]],"local":[{"MtimeBased":[[1513888303,17171189],"/home/keringar/projects/bang/target/x86_64-bang/debug/.fingerprint/bang-5e56d9f9e2fa403a/dep-lib-bang-5e56d9f9e2fa403a"]}],"rustflags":["--sysroot","/home/keringar/.xargo"]}

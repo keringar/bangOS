@@ -1,0 +1,15 @@
+[package]
+authors = ["keringar <wanrunhu@gmail.com>"]
+name = "bang"
+version = "0.1.0"
+
+[dependencies]
+bitflags = "1.0.1"
+multiboot2 = "0.3.2"
+rlibc = "1.0"
+spin = "0.4.6"
+volatile = "0.2.3"
+x86_64 = "0.1.2"
+
+[lib]
+crate-type = ["staticlib"]
