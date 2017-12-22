@@ -38,4 +38,4 @@ kernel:
 # compile assembly files
 build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@
+	@nasm -f elf64 -F dwarf -g $< -o $@
