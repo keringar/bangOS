@@ -1,1 +1,0 @@
-{"rustc":5190010269457199862,"features":"[\"asm\", \"const_fn\", \"core_intrinsics\", \"default\", \"once\", \"unstable\"]","target":17407550201668217716,"profile":731176819336294830,"deps":[],"local":[{"Precalculated":"0.4.6"}],"rustflags":["--sysroot","/home/keringar/.xargo"]}
