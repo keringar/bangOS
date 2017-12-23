@@ -13,7 +13,7 @@ long_mode_start:
     mov gs, ax
 
     ; call the rust main
-    ; call rust_main
+    call rust_main
 
     ; print `OKAY` to screen
     mov rax, 0x2f592f412f4b2f4f

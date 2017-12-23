@@ -42,12 +42,11 @@ pub extern "C" fn rust_main(multiboot_info_addr: usize) {
         memory_map_tag.memory_areas(),
     );
 
-    println!("kernel_start: {:x}", kernel_start);
-    println!("kernel_end: {:x}", kernel_end);
-    println!("multiboot_start: {:x}", multiboot_start);
-    println!("multiboot_end: {:x}", multiboot_end);
+    println!("kernel_start: 0x{:x}", kernel_start);
+    println!("kernel_end: 0x{:x}", kernel_end);
+    println!("multiboot_start: 0x{:x}", multiboot_start);
+    println!("multiboot_end: 0x{:x}", multiboot_end);
 
-    vga_buffer::clear_screen();
     println!("Hello world");
 
     loop {}
