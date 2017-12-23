@@ -1,11 +1,12 @@
 use memory::paging::entry::{Entry, EntryFlags};
 use memory::paging::ENTRY_COUNT;
 use memory::FrameAllocator;
+use map;
 
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 
-pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _;
+pub const P4: *mut Table<Level4> = map::P4_TABLE_ADDRESS as *mut _;
 
 pub trait TableLevel {}
 
@@ -60,7 +61,8 @@ where
         if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE)
         {
             let table_address = self as *const _ as usize;
-            Some((table_address << 9) | (index << 12))
+            let sign_extension = 0o177777_000_000_000_000_0000 * ((table_address >> 47) & 0b1);
+            Some((((table_address << 9) | (index << 12)) & ((1 << 48) - 1)) | sign_extension)
         } else {
             None
         }

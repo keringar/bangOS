@@ -14,12 +14,11 @@ extern crate x86_64;
 #[macro_use]
 mod vga_buffer;
 mod memory;
-
-use memory::FrameAllocator;
+mod map;
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_info_addr: usize) {
-    let boot_info = unsafe { multiboot2::load(0xFFFFFFFF80000000 + multiboot_info_addr) };
+    let boot_info = unsafe { multiboot2::load(map::KERNEL_VMA + multiboot_info_addr) };
 
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
     let elf_sections_tag = boot_info
@@ -28,8 +27,8 @@ pub extern "C" fn rust_main(multiboot_info_addr: usize) {
     let kernel_start = elf_sections_tag
         .sections()
         .map(|s| {
-            if s.addr < 0xFFFFFFFF80000000 {
-                s.addr + 0xFFFFFFFF80000000
+            if s.addr < map::KERNEL_VMA as u64 {
+                s.addr + map::KERNEL_VMA as u64
             } else {
                 s.addr
             }
@@ -58,6 +57,8 @@ pub extern "C" fn rust_main(multiboot_info_addr: usize) {
     println!("multiboot_end: 0x{:x}", multiboot_end);
 
     println!("Hello world");
+
+    memory::test_paging(&mut frame_allocator);
 
     loop {}
 }
