@@ -1,11 +1,60 @@
 global start
-extern long_mode_start
 
-section .text
+; boot.asm is physically mapped and responsible for entering Long Mode and jumping into the kernel
+; Constants for addressing and creating page tables
+KERNEL_VMA equ 0xFFFFFFFF80000000
+PAGE_SIZE equ 0x1000 ; 4 KiB
+PAGE_PRESENT equ 0x1
+PAGE_WRITABLE equ 0x2
+PAGE_USER equ 0x4
+PAGE_HUGE equ 0x80
+PAGE_NO_EXEC equ 0x8000000000000000
+
+; === BOOTSTRAP DATA === 
+section .bootstrap_data
+align 4096
+; Page map with both an identity map and a higher side identity map
+p4_table:
+    dq (p3_table + PAGE_PRESENT + PAGE_WRITABLE) ; 0 - Identity map
+    times (512 - 3) dq 0                        ; ...
+    dq (p4_table + PAGE_PRESENT + PAGE_WRITABLE) ; 510 - Recursive mapping of P4
+    dq (p3_table_higher + PAGE_PRESENT + PAGE_WRITABLE) ; 511 - Higher half kernel map
+p3_table:
+    dq (p2_table + PAGE_PRESENT + PAGE_WRITABLE) ; 0
+    dq 0                                        ; 1
+    times (512 - 2) dq 0                        ; ...
+p3_table_higher:
+    times (512 - 2) dq 0                        ; ...
+    dq (p2_table + PAGE_PRESENT + PAGE_WRITABLE) ; 510 - Identity map
+    dq 0                                        ; 511
+p2_table: ; Map each page entry with 2 MiB huge pages
+    %assign pg 0
+    %rep 512
+        dq (pg + PAGE_PRESENT + PAGE_WRITABLE + PAGE_HUGE)
+        %assign pg pg+0x200000
+    %endrep
+
+; Global Descriptor Table
+gdt64:
+    dq 0 ; zero entry
+.code: equ $ - gdt64
+    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
+.pointer:
+    dw $ - gdt64 - 1
+    dq gdt64
+
+; Initial stack
+bootstrap_stack_bottom:
+    times 64 db 0 ; 64 bytes of temporary stack space
+bootstrap_stack_top:
+
+
+; === BOOTSTRAP CODE === 
+section .bootstrap
 bits 32
 start:
-    ; Update stack pointer to point to start of stack memory
-    mov esp, stack_top
+    ; Update stack pointer to point to the start of bootstrap stack
+    mov esp, bootstrap_stack_top
 
     ; Move Multiboot info pointer to edi
     mov edi, ebx
@@ -23,13 +72,37 @@ start:
     ; load the 64-bit GDT
     lgdt [gdt64.pointer]
 
-    ; Far jump to 64 bit code
-    jmp gdt64.code:long_mode_start
-    
-    ; print 'OK' to screen
-    mov dword [0xb8000], 0x2f4b2f4f
-    hlt
+    ; Far jump to a trampoline to 64 bit code
+    jmp gdt64.code:long_mode_trampoline
 
+set_up_page_tables:
+    ; map first P4 entry to P3 table
+    mov eax, p3_table
+    or eax, 0b11 ; present + writable
+    mov [p4_table], eax
+
+    ; map first P3 entry to P2 table
+    mov eax, p2_table
+    or eax, 0b11 ; present + writable
+    mov [p3_table], eax
+
+    ; map each P2 entry to a huge 2MiB page
+    mov ecx, 0         ; counter variable
+
+.map_p2_table:
+    ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
+    mov eax, 0x200000  ; 2MiB
+    mul ecx            ; start address of ecx-th page
+    or eax, 0b10000011 ; present + writable + huge
+    mov [p2_table + ecx * 8], eax ; map ecx-th entry
+
+    inc ecx            ; increase counter
+    cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
+    jne .map_p2_table  ; else map the next entry
+
+    ret
+
+; Clear the vga buffer to black
 clear_screen:
     pusha
     mov eax, 0x20
@@ -52,34 +125,16 @@ check_multiboot:
 
 ; Check if CPUID is supported. Copied from the OSdev wiki
 check_cpuid:
-    ; Check if CPUID is supported by attempting to flip the ID bit (bit 21) in
-    ; the FLAGS register. If we can flip it, CPUID is available.
- 
-    ; Copy FLAGS in to EAX via stack
     pushfd
     pop eax
- 
-    ; Copy to ECX as well for comparing later on
     mov ecx, eax
- 
-    ; Flip the ID bit
     xor eax, 1 << 21
- 
-    ; Copy EAX to FLAGS via the stack
     push eax
     popfd
- 
-    ; Copy FLAGS back to EAX (with the flipped bit if CPUID is supported)
     pushfd
     pop eax
- 
-    ; Restore FLAGS from the old version stored in ECX (i.e. flipping the ID bit
-    ; back if it was ever flipped).
     push ecx
     popfd
- 
-    ; Compare EAX and ECX. If they are equal then that means the bit wasn't
-    ; flipped, and CPUID isn't supported.
     cmp eax, ecx
     je .no_cpuid
     ret
@@ -104,37 +159,6 @@ check_long_mode:
 .no_long_mode:
     mov al, "2"
     jmp error
-
-set_up_page_tables:
-    ; Map the last entry of P4 to itself
-    mov eax, p4_table
-    or eax, 0b11 ; set PRESENT + WRITABLE
-    mov [p4_table + 511 * 8], eax
-
-    ; map first P4 entry to P3 table
-    mov eax, p3_table
-    or eax, 0b11 ; set PRESENT + WRITABLE
-    mov [p4_table], eax
-
-    ; map first P3 entry to P2 table
-    mov eax, p2_table
-    or eax, 0b11 ; set PRESENT + WRITABLE
-    mov [p3_table], eax
-
-    ; map each p2 entry to a 2 MiB page
-    mov ecx, 0 ; counter variable
-.map_p2_table:
-    ; map the ecx-th P2 entry to a huge page that starts at address 2 MiB * ecs
-    mov eax, 0x200000   ; 2 MiB
-    mul ecx             ; start address of the ecx-th page
-    or eax, 0b10000011  ; Start address of each ecx-th page
-    mov [p2_table + ecx * 8], eax ; map ecx-th entry
-
-    inc ecx           ; increment counter
-    cmp ecx, 512      ; if counter == 512
-    jne .map_p2_table ; then map the next entry
-
-    ret
 
 enable_paging:
     ; load P4 to to CR3 register
@@ -168,25 +192,48 @@ error:
     mov byte  [0xb800a], al
     hlt
 
-section .bss
-; Ensure page tables are page aligned
-align 4096
-p4_table:
-    resb 4096
-p3_table:
-    resb 4096
-p2_table:
-    resb 4096
-; Reserve stack space
-stack_bottom:
-    resb 4096 * 4
-stack_top:
+bits 64
+long_mode_trampoline:
+    mov rax, qword long_mode_start
+    jmp rax
 
-section .rodata
-gdt64:
-    dq 0 ; zero entry
-.code: equ $ - gdt64
-    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
-.pointer:
-    dw $ - gdt64 - 1
-    dq gdt64
+section .text
+bits 64
+extern rust_main
+
+long_mode_start:
+    ; Reload the GDT pointer with the correct virtual adress
+    mov rax, [gdt64.pointer + 2]
+    mov rbx, KERNEL_VMA
+    add rax, rbx
+    mov [gdt64.pointer], rax
+    mov rax, gdt64.pointer + KERNEL_VMA
+    lgdt [rax]
+
+    mov ax, 0
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    
+    ; Set up the actual stack
+    mov rbp, 0 ; Terminate stack traces here, can't cross from higher to lower addresses
+    mov rsp, stack_top
+
+    ; Unmap the identity map
+    mov qword [p4_table], 0x0
+    invlpg [0x0]
+
+    ; Call into the kernel proper
+    call rust_main
+
+    ; Halt if we ever return
+    hlt
+
+section .bss
+global _guard_page
+_guard_page:
+    resb 4096 ; Intentionally unmapped
+stack_bottom:
+    resb 4096 * 4 ; 16 KiB stack space
+stack_top:

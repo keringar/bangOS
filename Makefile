@@ -10,7 +10,7 @@ assembly_source_files := $(wildcard src/arch/$(arch)/*.asm)
 assembly_object_files := $(patsubst src/arch/$(arch)/%.asm, \
 	build/arch/$(arch)/%.o, $(assembly_source_files))
 
-.PHONY: all clean run iso kernel
+.PHONY: all clean run debug iso kernel
 
 all: $(kernel)
 
@@ -19,6 +19,9 @@ clean:
 
 run: $(iso)
 	@qemu-system-x86_64 -cdrom $(iso)
+
+debug: $(iso)
+	@qemu-system-x86_64 -cdrom $(iso) -s -S
 
 iso: $(iso)
 

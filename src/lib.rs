@@ -19,13 +19,23 @@ use memory::FrameAllocator;
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_info_addr: usize) {
-    let boot_info = unsafe { multiboot2::load(multiboot_info_addr) };
+    let boot_info = unsafe { multiboot2::load(0xFFFFFFFF80000000 + multiboot_info_addr) };
 
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
     let elf_sections_tag = boot_info
         .elf_sections_tag()
         .expect("Elf-sections tag required");
-    let kernel_start = elf_sections_tag.sections().map(|s| s.addr).min().unwrap();
+    let kernel_start = elf_sections_tag
+        .sections()
+        .map(|s| {
+            if s.addr < 0xFFFFFFFF80000000 {
+                s.addr + 0xFFFFFFFF80000000
+            } else {
+                s.addr
+            }
+        })
+        .min()
+        .unwrap();
     let kernel_end = elf_sections_tag
         .sections()
         .map(|s| s.addr + s.size)
