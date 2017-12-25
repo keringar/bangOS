@@ -3,7 +3,7 @@ use core::fmt;
 use volatile::Volatile;
 use spin::Mutex;
 
-use map;
+use memory::map::VGA_BUFFER_VMA;
 
 #[allow(dead_code)]
 #[repr(u8)]
@@ -142,7 +142,7 @@ impl fmt::Write for Writer {
 pub static WRITER: Mutex<Writer> = Mutex::new(Writer {
     column_position: 0,
     color_code: ColorCode::new(Color::LightGreen, Color::Black),
-    buffer: unsafe { Unique::new_unchecked(map::VGA_BUFFER_VMA as *mut _) },
+    buffer: unsafe { Unique::new_unchecked(VGA_BUFFER_VMA as *mut _) },
 });
 
 macro_rules! print {

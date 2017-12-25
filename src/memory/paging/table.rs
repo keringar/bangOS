@@ -1,12 +1,12 @@
+use memory::FrameAllocator;
 use memory::paging::entry::{Entry, EntryFlags};
 use memory::paging::ENTRY_COUNT;
-use memory::FrameAllocator;
-use map;
+use memory::map::P4_TABLE_ADDRESS;
 
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 
-pub const P4: *mut Table<Level4> = map::P4_TABLE_ADDRESS as *mut _;
+pub const P4: *mut Table<Level4> = P4_TABLE_ADDRESS as *mut _;
 
 pub trait TableLevel {}
 

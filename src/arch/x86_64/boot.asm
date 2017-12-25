@@ -42,6 +42,9 @@ gdt64:
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64
+.pointer_high:
+    dw .pointer - gdt64 - 1
+    dq gdt64 + KERNEL_VMA
 
 ; Initial stack
 bootstrap_stack_bottom:
@@ -51,6 +54,7 @@ bootstrap_stack_top:
 
 ; === BOOTSTRAP CODE === 
 section .bootstrap
+align 4096
 bits 32
 start:
     ; Update stack pointer to point to the start of bootstrap stack
@@ -171,16 +175,12 @@ long_mode_trampoline:
 
 section .text
 bits 64
+align 4096
 extern rust_main
 
 long_mode_start:
-    ; Reload the GDT pointer with the correct virtual adress
-    mov rax, [gdt64.pointer + 2]
-    mov rbx, KERNEL_VMA
-    add rax, rbx
-    mov [gdt64.pointer], rax
-    mov rax, gdt64.pointer + KERNEL_VMA
-    lgdt [rax]
+    ; Reload the GDT pointer with the correct virtual address
+    lgdt [gdt64.pointer_high + KERNEL_VMA]
 
     mov ax, 0
     mov ds, ax
@@ -189,7 +189,7 @@ long_mode_start:
     mov gs, ax
     
     ; Set up the actual stack
-    mov rbp, 0 ; Terminate stack traces here, can't cross from higher to lower addresses
+    mov rbp, stack_bottom ; Terminate stack traces here, can't cross from higher to lower addresses
     mov rsp, stack_top
 
     ; Unmap the identity map
@@ -203,6 +203,7 @@ long_mode_start:
     hlt
 
 section .bss
+align 4096
 global _guard_page
 _guard_page:
     resb 4096 ; Intentionally unmapped
