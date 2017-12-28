@@ -40,8 +40,14 @@ pub extern "C" fn rust_main(multiboot_info_addr: usize) {
         .map(|s| s.addr + s.size)
         .max()
         .unwrap();
-    let multiboot_start = multiboot_info_addr;
+    let multiboot_start = multiboot_info_addr + memory::map::KERNEL_VMA;
     let multiboot_end = multiboot_start + (boot_info.total_size as usize);
+
+    println!("kernel_start: 0x{:x}", kernel_start);
+    println!("kernel_end: 0x{:x}", kernel_end);
+
+    println!("multiboot_start: 0x{:x}", multiboot_start);
+    println!("multiboot_end: 0x{:x}", multiboot_end);
 
     let mut frame_allocator = memory::AreaFrameAllocator::new(
         kernel_start as usize,
@@ -52,11 +58,6 @@ pub extern "C" fn rust_main(multiboot_info_addr: usize) {
     );
 
     memory::remap_the_kernel(&mut frame_allocator, boot_info);
-
-    println!("kernel_start: 0x{:x}", kernel_start);
-    println!("kernel_end: 0x{:x}", kernel_end);
-    println!("multiboot_start: 0x{:x}", multiboot_start);
-    println!("multiboot_end: 0x{:x}", multiboot_end);
 
     println!("Hello world");
 
