@@ -53,7 +53,7 @@ impl Iterator for FrameIter {
     type Item = Frame;
 
     fn next(&mut self) -> Option<Frame> {
-        if self.start < self.end {
+        if self.start <= self.end {
             let frame = self.start.clone();
             self.start.number += 1;
 

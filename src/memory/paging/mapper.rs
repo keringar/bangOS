@@ -34,10 +34,10 @@ impl Mapper {
     where
         A: FrameAllocator,
     {
-        let mut p3 = self.p4_mut()
-            .next_table_or_create(page.p4_index(), allocator);
-        let mut p2 = p3.next_table_or_create(page.p3_index(), allocator);
-        let mut p1 = p2.next_table_or_create(page.p2_index(), allocator);
+        let p4 = self.p4_mut();
+        let p3 = p4.next_table_or_create(page.p4_index(), allocator);
+        let p2 = p3.next_table_or_create(page.p3_index(), allocator);
+        let p1 = p2.next_table_or_create(page.p2_index(), allocator);
 
         // Assert page is unmapped
         assert!(p1[page.p1_index()].is_unused());
@@ -132,6 +132,6 @@ impl Mapper {
 
         // TODO: free p1/2/3 if empty
 
-        // allocator.deallocate_frame(frame);
+        allocator.deallocate_frame(frame);
     }
 }

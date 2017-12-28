@@ -1,4 +1,5 @@
 use memory::Frame;
+use multiboot2::ElfSection;
 
 // A single entry into the page table. An unused entry is defined to be 0
 pub struct Entry(u64);
@@ -56,5 +57,26 @@ bitflags! {
         const GLOBAL          = 1 << 8;
         // Forbid code execution
         const NO_EXECUTE      = 1 << 63;
+    }
+}
+
+impl EntryFlags {
+    pub fn from_elf_section(section: &ElfSection) -> EntryFlags {
+        use multiboot2::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE, ELF_SECTION_EXECUTABLE};
+        let mut flags = EntryFlags::empty();
+
+        if section.flags().contains(ELF_SECTION_ALLOCATED) {
+            flags |= EntryFlags::PRESENT;
+        }
+
+        if section.flags().contains(ELF_SECTION_WRITABLE) {
+            flags |= EntryFlags::WRITABLE;
+        }
+
+        if section.flags().contains(ELF_SECTION_EXECUTABLE) {
+            flags |= EntryFlags::NO_EXECUTE;
+        }
+
+        flags
     }
 }

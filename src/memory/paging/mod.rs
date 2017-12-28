@@ -36,14 +36,24 @@ where
         static _guard_page: u8;
     }
     let guard_page_addr = unsafe { ((&_guard_page as *const u8) as *const usize) as usize };
+    assert!(
+        guard_page_addr % PAGE_SIZE == 0,
+        "Guard page is not page aligned"
+    );
 
     // Map a new page table
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
-        let elf_sections_tag = boot_info
-            .elf_sections_tag()
-            .expect("Memory map tag required");
+        // Map the frame buffer
+        mapper.map_to(
+            Page::containing_address(VGA_BUFFER_VMA),
+            Frame::containing_address(0xb8000),
+            EntryFlags::WRITABLE,
+            allocator,
+        );
 
-        // Map kernel elf sections
+        let elf_sections_tag = boot_info.elf_sections().expect("Memory map tag required");
+
+        // Map kernel elf sections except for the stack guard page
         for section in elf_sections_tag.sections() {
             // Skip sections that aren't allocated (i.e. debugging sections) or before the start
             // of the higher half and therefore not part of the kernel.
@@ -56,21 +66,27 @@ where
                 "Sections must be page aligned"
             );
 
-            let flags = EntryFlags::WRITABLE | EntryFlags::PRESENT; // TODO: Use section flags
+            let flags = EntryFlags::from_elf_section(section);
             let start_frame = Frame::containing_address(section.start_address());
             let end_frame = Frame::containing_address(section.end_address() - 1);
 
-            for frame in Frame::range_inclusive(start_frame, end_frame) {
-                let virtual_address = frame.start_address(); // 0xffffffff80109000
-                let physical_address = virtual_address - KERNEL_VMA; // 0x109000
+            println!(
+                "Allocating section: {} to {:#x} - {:#x}",
+                elf_sections_tag
+                    .string_table(boot_info)
+                    .section_name(&section),
+                section.start_address(),
+                section.end_address()
+            );
 
-                // Ensure everything we map is page aligned
-                assert!(
-                    Page::containing_address(virtual_address).start_address() == virtual_address
-                );
-                assert!(
-                    Frame::containing_address(physical_address).start_address() == physical_address
-                );
+            for frame in Frame::range_inclusive(start_frame, end_frame) {
+                let virtual_address = frame.start_address();
+                let physical_address = virtual_address - KERNEL_VMA;
+
+                // Don't map the page containing the stack guard page
+                if Frame::containing_address(guard_page_addr) == frame {
+                    continue;
+                }
 
                 mapper.map_to(
                     Page::containing_address(virtual_address),
@@ -80,14 +96,6 @@ where
                 );
             }
         }
-
-        // Map the frame buffer
-        mapper.map_to(
-            Page::containing_address(VGA_BUFFER_VMA),
-            Frame::containing_address(0xb8000),
-            EntryFlags::WRITABLE,
-            allocator,
-        );
 
         // Map the multiboot structure
         let multiboot_start = Frame::containing_address(boot_info.start_address());
@@ -101,18 +109,9 @@ where
                 allocator,
             );
         }
-
-        // Unmap the stack guard page to cause a page fault on stack overflow
-        assert!(
-            guard_page_addr % PAGE_SIZE == 0,
-            "Guard page must be page aligned"
-        );
-
-        mapper.unmap(Page::containing_address(guard_page_addr), allocator);
     });
 
     active_table.switch(new_table);
-    loop{}
 }
 
 pub struct ActivePageTable {
@@ -186,11 +185,12 @@ impl ActivePageTable {
         unsafe {
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
-        
+
         old_table
     }
 }
 
+#[derive(Debug)]
 pub struct InactivePageTable {
     p4_frame: Frame,
 }

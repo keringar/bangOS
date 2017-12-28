@@ -43,15 +43,15 @@ impl AreaFrameAllocator {
         self.current_area = self.areas
             .clone()
             .filter(|area| {
-                let address = area.base_addr + area.length - 1;
+                let address = area.start_address() + area.size() + 1;
                 Frame::containing_address(address as usize) >= self.next_free_frame
             })
-            .min_by_key(|area| area.base_addr);
+            .min_by_key(|area| area.start_address());
 
         // Iff a new area bigger than the current max was found, update the next_free_frame to
         // point to the first frame of the new area.
         if let Some(area) = self.current_area {
-            let start_frame = Frame::containing_address(area.base_addr as usize);
+            let start_frame = Frame::containing_address(area.start_address() as usize);
             if self.next_free_frame < start_frame {
                 self.next_free_frame = start_frame;
             }
@@ -68,10 +68,8 @@ impl FrameAllocator for AreaFrameAllocator {
             };
 
             // Get the last frame that is still in the current area
-            let last_frame_from_current_area = {
-                let address = area.base_addr + area.length - 1;
-                Frame::containing_address(address as usize)
-            };
+            let last_frame_from_current_area =
+                Frame::containing_address(area.start_address() + area.size() - 1);
 
             if frame > last_frame_from_current_area {
                 // All frames from the current area are in use, switch to the next area

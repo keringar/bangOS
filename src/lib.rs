@@ -15,49 +15,39 @@ extern crate x86_64;
 mod vga_buffer;
 mod memory;
 
+use memory::map::KERNEL_VMA;
+use multiboot2::BootInformation;
+
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_info_addr: usize) {
-    let boot_info =
-        unsafe { multiboot2::load(memory::map::KERNEL_VMA + multiboot_info_addr) };
+    let boot_info = unsafe { BootInformation::load(multiboot_info_addr, KERNEL_VMA) };
 
-    let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-    let elf_sections_tag = boot_info
-        .elf_sections_tag()
-        .expect("Elf-sections tag required");
-    let kernel_start = elf_sections_tag
-        .sections()
-        .map(|s| {
-            if s.addr < memory::map::KERNEL_VMA as u64 {
-                s.addr + memory::map::KERNEL_VMA as u64
-            } else {
-                s.addr
-            }
-        })
-        .min()
-        .unwrap();
-    let kernel_end = elf_sections_tag
-        .sections()
-        .map(|s| s.addr + s.size)
-        .max()
-        .unwrap();
-    let multiboot_start = multiboot_info_addr + memory::map::KERNEL_VMA;
-    let multiboot_end = multiboot_start + (boot_info.total_size as usize);
+    let memory_map = boot_info.memory_map().expect("Memory map tag required");
 
-    println!("kernel_start: 0x{:x}", kernel_start);
-    println!("kernel_end: 0x{:x}", kernel_end);
+    extern "C" {
+        static _higher_start: u8;
+        static _end: u8;
+    }
 
-    println!("multiboot_start: 0x{:x}", multiboot_start);
-    println!("multiboot_end: 0x{:x}", multiboot_end);
+    let kernel_start = unsafe { ((&_higher_start as *const u8) as *const usize) as usize };
+    let kernel_end = unsafe { ((&_end as *const u8) as *const usize) as usize };
+
+    println!("Loaded kernel to 0x{:x} - 0x{:x}", kernel_start, kernel_end);
+    println!(
+        "Boot information at: 0x{:x} - 0x{:x}",
+        boot_info.start_address(),
+        boot_info.end_address()
+    );
 
     let mut frame_allocator = memory::AreaFrameAllocator::new(
         kernel_start as usize,
         kernel_end as usize,
-        multiboot_start as usize,
-        multiboot_end as usize,
-        memory_map_tag.memory_areas(),
+        boot_info.start_address() as usize,
+        boot_info.end_address() as usize,
+        memory_map.memory_areas(),
     );
 
-    memory::remap_the_kernel(&mut frame_allocator, boot_info);
+    memory::remap_the_kernel(&mut frame_allocator, &boot_info);
 
     println!("Hello world");
 
