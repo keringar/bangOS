@@ -22,32 +22,7 @@ use multiboot2::BootInformation;
 pub extern "C" fn rust_main(multiboot_info_addr: usize) {
     let boot_info = unsafe { BootInformation::load(multiboot_info_addr, KERNEL_VMA) };
 
-    let memory_map = boot_info.memory_map().expect("Memory map tag required");
-
-    extern "C" {
-        static _higher_start: u8;
-        static _end: u8;
-    }
-
-    let kernel_start = unsafe { ((&_higher_start as *const u8) as *const usize) as usize };
-    let kernel_end = unsafe { ((&_end as *const u8) as *const usize) as usize };
-
-    println!("Loaded kernel to 0x{:x} - 0x{:x}", kernel_start, kernel_end);
-    println!(
-        "Boot information at: 0x{:x} - 0x{:x}",
-        boot_info.start_address(),
-        boot_info.end_address()
-    );
-
-    let mut frame_allocator = memory::AreaFrameAllocator::new(
-        kernel_start as usize,
-        kernel_end as usize,
-        boot_info.start_address() as usize,
-        boot_info.end_address() as usize,
-        memory_map.memory_areas(),
-    );
-
-    memory::remap_the_kernel(&mut frame_allocator, &boot_info);
+    memory::init(&boot_info);
 
     println!("Hello world");
 

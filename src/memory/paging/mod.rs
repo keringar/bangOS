@@ -22,16 +22,17 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
 where
     A: FrameAllocator,
 {
+    // Contains the initial page tables from bootstrap
     let mut active_table = unsafe { ActivePageTable::new() };
 
+    // Allocate space for a new set of page tables and set up a new inactive page table
     let mut temporary_page = TemporaryPage::new(Page::containing_address(TEMP_PAGE), allocator);
-
     let mut new_table = {
         let frame = allocator.allocate_frame().expect("No more free frames");
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
     };
 
-    // The address of this guard page is the first page below the stack
+    // Get the address of the guard page
     extern "C" {
         static _guard_page: u8;
     }
@@ -41,16 +42,8 @@ where
         "Guard page is not page aligned"
     );
 
-    // Map a new page table
+    // Map the new page table
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
-        // Map the frame buffer
-        mapper.map_to(
-            Page::containing_address(VGA_BUFFER_VMA),
-            Frame::containing_address(0xb8000),
-            EntryFlags::WRITABLE,
-            allocator,
-        );
-
         let elf_sections_tag = boot_info.elf_sections().expect("Memory map tag required");
 
         // Map kernel elf sections except for the stack guard page
@@ -66,18 +59,9 @@ where
                 "Sections must be page aligned"
             );
 
-            let flags = EntryFlags::from_elf_section(section);
+            let flags       = EntryFlags::from_elf_section(section);
             let start_frame = Frame::containing_address(section.start_address());
-            let end_frame = Frame::containing_address(section.end_address() - 1);
-
-            println!(
-                "Allocating section: {} to {:#x} - {:#x}",
-                elf_sections_tag
-                    .string_table(boot_info)
-                    .section_name(&section),
-                section.start_address(),
-                section.end_address()
-            );
+            let end_frame   = Frame::containing_address(section.end_address() - 1);
 
             for frame in Frame::range_inclusive(start_frame, end_frame) {
                 let virtual_address = frame.start_address();
@@ -96,6 +80,14 @@ where
                 );
             }
         }
+
+        // Map the frame buffer
+        mapper.map_to(
+            Page::containing_address(VGA_BUFFER_VMA),
+            Frame::containing_address(0xb8000),
+            EntryFlags::WRITABLE,
+            allocator,
+        );
 
         // Map the multiboot structure
         let multiboot_start = Frame::containing_address(boot_info.start_address());
@@ -150,15 +142,15 @@ impl ActivePageTable {
     {
         use x86_64::instructions::tlb;
         use x86_64::registers::control_regs;
-        {
-            let backup = Frame::containing_address(unsafe { control_regs::cr3().0 } as usize);
 
-            // Map temporary page to current P4 table
-            let p4_table = temporary_page.map_table_frame(backup.clone(), self);
+        // Inner scope to end the borrow of "temporary page"
+        {
+            // Backup the current P4 and temporarily remap it
+            let original_p4 = Frame::containing_address(control_regs::cr3().0 as usize);
+            let p4_table = temporary_page.map_table_frame(original_p4.clone(), self);
 
             // Overwrite recursive mapping
-            self.p4_mut()[RECURSIVE_ENTRY].set(
-                table.p4_frame.clone(),
+            self.p4_mut()[RECURSIVE_ENTRY].set(table.p4_frame.clone(),
                 EntryFlags::PRESENT | EntryFlags::WRITABLE,
             );
             tlb::flush_all();
@@ -166,7 +158,7 @@ impl ActivePageTable {
             f(self);
 
             // Restore recursive mapping to original P4 table
-            p4_table[RECURSIVE_ENTRY].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[RECURSIVE_ENTRY].set(original_p4, EntryFlags::PRESENT | EntryFlags::WRITABLE);
             tlb::flush_all();
         }
 
@@ -181,11 +173,11 @@ impl ActivePageTable {
         let old_table = InactivePageTable {
             p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
         };
-
+        
         unsafe {
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
-
+        println!("test");
         old_table
     }
 }

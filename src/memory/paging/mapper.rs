@@ -45,14 +45,6 @@ impl Mapper {
         p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
     }
 
-    pub fn identity_map<A>(&mut self, frame: Frame, flags: EntryFlags, allocator: &mut A)
-    where
-        A: FrameAllocator,
-    {
-        let page = Page::containing_address(frame.start_address());
-        self.map_to(page, frame, flags, allocator)
-    }
-
     pub fn p4(&self) -> &Table<Level4> {
         unsafe { self.p4.as_ref() }
     }
