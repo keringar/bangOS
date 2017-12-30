@@ -59,9 +59,9 @@ where
                 "Sections must be page aligned"
             );
 
-            let flags       = EntryFlags::from_elf_section(section);
+            let flags = EntryFlags::from_elf_section(section);
             let start_frame = Frame::containing_address(section.start_address());
-            let end_frame   = Frame::containing_address(section.end_address() - 1);
+            let end_frame = Frame::containing_address(section.end_address() - 1);
 
             for frame in Frame::range_inclusive(start_frame, end_frame) {
                 let virtual_address = frame.start_address();
@@ -150,7 +150,8 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(original_p4.clone(), self);
 
             // Overwrite recursive mapping
-            self.p4_mut()[RECURSIVE_ENTRY].set(table.p4_frame.clone(),
+            self.p4_mut()[RECURSIVE_ENTRY].set(
+                table.p4_frame.clone(),
                 EntryFlags::PRESENT | EntryFlags::WRITABLE,
             );
             tlb::flush_all();
@@ -173,7 +174,7 @@ impl ActivePageTable {
         let old_table = InactivePageTable {
             p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
         };
-        
+
         unsafe {
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }

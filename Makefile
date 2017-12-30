@@ -16,13 +16,13 @@ all: $(kernel)
 
 clean:
 	@rm -r build
-	@cargo clean
+	@xargo clean
 
 run: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso)
+	@qemu-system-x86_64 -enable-kvm --no-reboot --no-shutdown -cdrom $(iso)
 
 debug: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -s -S
+	@qemu-system-x86_64 -enable-kvm --no-reboot --no-shutdown -cdrom $(iso) -s -S
 
 iso: $(iso)
 

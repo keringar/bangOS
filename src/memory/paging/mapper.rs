@@ -98,6 +98,14 @@ impl Mapper {
             .and_then(|p1| p1[page.p1_index()].pointed_frame())
             .or_else(huge_page)
     }
+    
+    pub fn identity_map<A>(&mut self, frame: Frame, flags: EntryFlags, allocator: &mut A)
+    where
+        A: FrameAllocator,
+    {
+        let page = Page::containing_address(frame.start_address());
+        self.map_to(page, frame, flags, allocator)
+    }
 
     pub fn unmap<A>(&mut self, page: Page, allocator: &mut A)
     where
