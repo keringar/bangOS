@@ -1,0 +1,12 @@
+Paging Notes
+
+The recursive entry is located at pml4[510][510][510][510]
+Each p1 entry maps a 2 MiB page
+Therefore
+      0xFFFF000000000000
+    + 0x0000FF0000000000 // 510 * 512 GiB = 510 * 512 * 512 * 512 * 1 page
+    + 0x0000007F80000000 // 510 * 1024 MiB = 510 * 512 * 512 * 1 page
+    + 0x000000003FC00000 // 510 * 2048 KiB = 510 * 512 * 1 page
+    + 0x00000000001FE000 // 510 * 4096 bytes = 510 * 1 page
+    --------------------
+      0xFFFFFF7FBFDFE000
