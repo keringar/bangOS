@@ -67,11 +67,6 @@ where
                 let virtual_address = frame.start_address();
                 let physical_address = virtual_address - KERNEL_VMA;
 
-                // Don't map the page containing the stack guard page
-                if Frame::containing_address(guard_page_addr) == frame {
-                    continue;
-                }
-
                 mapper.map_to(
                     Page::containing_address(virtual_address),
                     Frame::containing_address(physical_address),
@@ -101,6 +96,9 @@ where
                 allocator,
             );
         }
+
+        // Unmap the guard page
+        mapper.unmap(Page::containing_address(guard_page_addr), allocator);
     });
 
     active_table.switch(new_table);
@@ -176,9 +174,11 @@ impl ActivePageTable {
         };
 
         unsafe {
-            control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
+            let address = new_table.p4_frame.start_address() as usize;
+            asm!("mov $0, %cr3" :: "r" (address));
+            //control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
-        println!("test");
+
         old_table
     }
 }

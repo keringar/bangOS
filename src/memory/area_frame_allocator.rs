@@ -69,7 +69,7 @@ impl FrameAllocator for AreaFrameAllocator {
 
             // Get the last frame that is still in the current area
             let last_frame_from_current_area =
-                Frame::containing_address(area.start_address() + area.size() - 1);
+                Frame::containing_address((area.start_address() + area.size() - 1) as usize);
 
             if frame > last_frame_from_current_area {
                 // All frames from the current area are in use, switch to the next area

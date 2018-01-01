@@ -79,13 +79,6 @@ pub fn init(boot_info: &BootInformation) {
     let kernel_start = unsafe { ((&_higher_start as *const u8) as *const usize) as usize };
     let kernel_end = unsafe { ((&_end as *const u8) as *const usize) as usize };
 
-    println!("Loaded kernel to 0x{:x} - 0x{:x}", kernel_start, kernel_end);
-    println!(
-        "Boot information at: 0x{:x} - 0x{:x}",
-        boot_info.start_address(),
-        boot_info.end_address()
-    );
-
     let mut frame_allocator = AreaFrameAllocator::new(
         kernel_start as usize,
         kernel_end as usize,
@@ -94,5 +87,26 @@ pub fn init(boot_info: &BootInformation) {
         memory_map.memory_areas(),
     );
 
+    enable_nxe_bit();
+    enable_write_protect_bit();
+
     remap_the_kernel(&mut frame_allocator, &boot_info);
+}
+
+fn enable_nxe_bit() {
+    use x86_64::registers::msr::{IA32_EFER, rdmsr, wrmsr};
+
+    let nxe_bit = 1 << 11;
+    unsafe {
+        let efer = rdmsr(IA32_EFER);
+        wrmsr(IA32_EFER, efer | nxe_bit);
+    }
+}
+
+fn enable_write_protect_bit() {
+    use x86_64::registers::control_regs::{cr0, cr0_write, Cr0};
+
+    unsafe {
+        cr0_write(cr0() | Cr0::WRITE_PROTECT);
+    }
 }

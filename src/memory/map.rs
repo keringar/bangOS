@@ -6,6 +6,7 @@
 // P4 at 510 instead. Everything else from 0x0 to 0xffffff7fffffff can be used by user mode.
 pub const RECURSIVE_ENTRY: usize = 510;
 
+// 0xFFFF + (510 << 39) + (510 << 30) + (510 << 21) + (510 << 12)
 pub const P4_TABLE_ADDRESS: usize = 0o177777_000_000_000_000_0000 + (RECURSIVE_ENTRY<<39) // P4 slot
                                                                   + (RECURSIVE_ENTRY<<30) // P3 slot
                                                                   + (RECURSIVE_ENTRY<<21) // P2 slot
