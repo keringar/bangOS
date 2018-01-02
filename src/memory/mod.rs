@@ -67,7 +67,6 @@ impl Iterator for FrameIter {
 
 pub fn init(boot_info: &BootInformation) {
     let memory_map = boot_info.memory_map().expect("Memory map tag required");
-    let elf_sections = boot_info.elf_sections().expect("ELF sections tag required");
 
     // Contains the start and end values of the kernel
     extern "C" {

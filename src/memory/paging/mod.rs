@@ -166,7 +166,6 @@ impl ActivePageTable {
 
     /// Switch the active page table with the passed in page table. Returns the old page table.
     pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
-        use x86_64::PhysicalAddress;
         use x86_64::registers::control_regs;
 
         let old_table = InactivePageTable {
@@ -176,7 +175,6 @@ impl ActivePageTable {
         unsafe {
             let address = new_table.p4_frame.start_address() as usize;
             asm!("mov $0, %cr3" :: "r" (address));
-            //control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
 
         old_table
